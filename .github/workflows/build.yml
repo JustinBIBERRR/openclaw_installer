@@ -1,54 +1,54 @@
 name: Build & Release
 
 on:
-  # 每次推送到 main 分支或打 tag 时自动构建
   push:
     branches: [main, master]
     tags: [v*]
-  # 允许手动在 GitHub 页面点击触发
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: windows-latest  # 在 Windows 11 环境编译，signtool 直接可用
+    runs-on: windows-latest
 
     steps:
-      # 1. 检出代码
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整 git 历史，确保 git describe 能拿到版本号
+          fetch-depth: 0
 
-      # 2. 安装 Go
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache: true  # 缓存依赖，加速构建
+          cache: false  # go.sum 不在仓库中，禁用缓存避免报错
 
-      # 3. 同步依赖（自动生成 go.sum，无需本地预先运行）
-      - name: Tidy dependencies
-        run: go mod tidy
+      # go mod tidy 生成 go.sum 并拉取所有依赖
+      - name: Tidy & download dependencies
+        run: |
+          go mod tidy
+          go mod download
+        env:
+          GONOSUMDB: "*"
+          GOFLAGS: "-mod=mod"
 
-      # 4. 编译
       - name: Build
         run: |
           $tag = git describe --tags --always 2>$null
           if (-not $tag -or $tag -eq "") { $tag = "dev" }
-          Write-Host "Building version: $tag"
+          Write-Host "Version: $tag"
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           go build -ldflags "-s -w -X main.Version=$tag" -o dist\openclaw-manager-amd64.exe .
           $size = (Get-Item dist\openclaw-manager-amd64.exe).Length
-          Write-Host "Build complete: $size bytes"
+          Write-Host "OK: $size bytes"
+        env:
+          GOFLAGS: "-mod=mod"
 
-      # 5. 计算 SHA256（方便用户验证下载完整性）
       - name: Compute SHA256
         run: |
           $hash = (Get-FileHash dist\openclaw-manager-amd64.exe -Algorithm SHA256).Hash.ToLower()
           "$hash  openclaw-manager-amd64.exe" | Out-File -Encoding ascii dist\SHA256SUMS.txt
           Write-Host "SHA256: $hash"
 
-      # 6. 上传构建产物（每次 push 都可以在 Actions 页面下载）
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -58,7 +58,6 @@ jobs:
             dist/SHA256SUMS.txt
           retention-days: 30
 
-      # 7. 如果是 tag 推送，自动创建 GitHub Release 并附上 exe
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -66,6 +65,4 @@ jobs:
           files: |
             dist/openclaw-manager-amd64.exe
             dist/SHA256SUMS.txt
-          generate_release_notes: true  # 自动生成发布说明
-          draft: false
-          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+          generate_release_notes: true
