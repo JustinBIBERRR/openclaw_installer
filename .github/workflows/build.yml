@@ -1,12 +1,10 @@
 name: Build & Release
 
 on:
-  # 每次推送到 main 分支时自动构建（用于测试）
+  # 每次推送到 main 分支或打 tag 时自动构建
   push:
     branches: [main, master]
-  # 打 tag（如 v1.0.0）时自动发布 Release
-  tags:
-    - 'v*'
+    tags: [v*]
   # 允许手动在 GitHub 页面点击触发
   workflow_dispatch:
 
