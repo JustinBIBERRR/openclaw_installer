@@ -17,6 +17,7 @@ pub fn run() {
             commands::open_url,
             commands::relaunch_as_admin,
             commands::uninstall,
+            commands::get_default_install_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

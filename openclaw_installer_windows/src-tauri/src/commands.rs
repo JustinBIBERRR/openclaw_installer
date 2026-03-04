@@ -304,16 +304,37 @@ fn find_free_port(start: u16) -> u16 {
     start
 }
 
+fn default_install_dir_inner() -> String {
+    // 优先使用 %LOCALAPPDATA%\OpenClaw（Windows 标准用户级应用数据目录）
+    // 例如 C:\Users\Alice\AppData\Local\OpenClaw
+    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+        return format!("{}\\OpenClaw", local);
+    }
+    // 次选 %USERPROFILE%\OpenClaw
+    if let Ok(profile) = std::env::var("USERPROFILE") {
+        return format!("{}\\OpenClaw", profile);
+    }
+    // 最后兜底
+    "C:\\OpenClaw".to_string()
+}
+
 fn check_path(path: &str) -> (bool, String, String) {
     let has_non_ascii = path.chars().any(|c| !c.is_ascii());
     let has_space = path.contains(' ');
+    let fallback = default_install_dir_inner();
     if has_non_ascii {
-        return (false, "路径包含中文或特殊字符，建议使用 C:\\OpenClaw".into(), "C:\\OpenClaw".into());
+        return (false, format!("路径包含中文或特殊字符，建议使用 {}", fallback), fallback);
     }
     if has_space {
-        return (false, "路径包含空格，建议使用 C:\\OpenClaw".into(), "C:\\OpenClaw".into());
+        return (false, format!("路径包含空格，建议使用 {}", fallback), fallback);
     }
     (true, String::new(), path.to_string())
+}
+
+/// 返回推荐的安装目录（基于当前用户的 %LOCALAPPDATA%）
+#[tauri::command]
+pub fn get_default_install_dir() -> String {
+    default_install_dir_inner()
 }
 
 fn check_network_sync() -> bool {
