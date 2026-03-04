@@ -1,0 +1,6 @@
+# 嵌套 git 仓库
+enable_openclaw_feishu_lark/
+
+# 临时文件
+*.log
+commit_msg.txt
